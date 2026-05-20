@@ -1,5 +1,3 @@
-# This is a comment, check how git works
-
 using DataFrames , Polynomials , CSV , Random , Combinatorics 
 function de_casteljeu_alg(coeffs)
     l=length(coeffs)
