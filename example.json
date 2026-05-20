@@ -1,0 +1,15 @@
+{
+    "name": "example",
+    "TeX": "x^2 - 2",
+    "julia": "x^2 - 2",
+    "python": "x**  2 - 2",  
+    "monomial_basis": [],
+    "bernstein_basis": [],
+    "degree": 0,
+    "bitsize": 0,
+    "#real_roots": 0,
+    "#integer_roots": 0,
+    "roots": [],
+    "sign_changes_monomial_basis": [],
+    "sign_changes_bernstein_basis": []
+}
