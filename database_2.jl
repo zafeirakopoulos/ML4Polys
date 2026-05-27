@@ -82,11 +82,14 @@ function sign_changes(coeff_s, x)
     return changes
 
 end
-function real_root_count(coeff_s)
+function discr_real_roots(coeff_s)
     l = length(coeff_s)
     v_b=sign_changes(coeff_s, Inf)
     v_s=sign_changes(coeff_s, -Inf)
     return v_s-v_b
+end
+function real_root_count(coeff_s)
+    
 end
 coeffs_example = [0, 4, 0, -5, 0, 1]
 counts=real_root_count(coeffs_example)
@@ -99,7 +102,7 @@ function construct_json_db(n,deg)
      while polyn_r<n/2 || polyn_nr<n/2
           coeffs=rand(deg+1)*2 .- 1
           bern_coeffs=change_of_basis(coeffs)*coeffs
-          root_multi=real_root_mult(coeffs)
+          root_multi=real_root_count(coeffs)
           if root_multi==0 
              polyn_nr=polyn_nr+1
              poly_entry = Dict(
