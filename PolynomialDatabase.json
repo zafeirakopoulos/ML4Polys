@@ -1,0 +1,12 @@
+
+{
+    "polynomials": [
+      {
+        "Polynomial": "x^2 - 5x + 6",
+        "Encoded vector": [6,-5,1],
+        "Degree": 2,
+        "Roots": [2,3]
+      }  
+
+    ]
+}
