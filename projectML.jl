@@ -1,4 +1,5 @@
-using Random, DataFrames, Flux, Lux, CSV, Polynomials, JSON
+using Random, Combinatorics, Flux, Polynomials, JSON
+using Flux: Chain, Dense, ADAM, mse, train!
 # This is the first version of the code for the training set 
 #function train_set(n) # n is the number of polynomials
     #train_set = []
@@ -15,7 +16,7 @@ using Random, DataFrames, Flux, Lux, CSV, Polynomials, JSON
 #end
 
 
-function data_set_monomial_base(; deg=100, n=20) # n is the number of polynomials, deg is the degree of the polynomials
+function data_set_monomial_basis(; deg=100, n=1000) # n is the number of polynomials, deg is the degree of the polynomials
     data_set = Vector{Vector{BigFloat}}() # this is the list which contains the data set of polynomials in monomial basis
     for i in 1:n
         coeff=BigFloat[]
@@ -32,9 +33,11 @@ function data_set_monomial_base(; deg=100, n=20) # n is the number of polynomial
     return data_set
 end
 
-global data_set = data_set_monomial_base(deg=100, n=20) # this is the global variable which contains the 
-                                                        # data set of polynomials in monomial basis 
 
+function read_json_data_set() 
+        data = JSON.parsefile("check_set_monomial_basis.json")
+    return data["monomial_basis"]
+end
 
 function  save_data_set(data_set, filename::String)
     open(filename, "w") do io
@@ -44,7 +47,7 @@ end
     
 
 
-function Cauchy_bound(data_set) # this function computes the Cauchy bound for the roots of the polynomials in the data set
+function Cauchy_bound(data_set=read_json_data_set("check_set_monomial_basis.json")) # this function computes the Cauchy bound for the roots of the polynomials in the data set
     bound = BigFloat[]
     for i in 1:length(data_set)
         max_coeff = BigFloat(0)
@@ -58,7 +61,46 @@ function Cauchy_bound(data_set) # this function computes the Cauchy bound for th
     return bound
 end
 
-function Strum_sequence(data_set)   # this fundtion uses the Strum sequence to compute the number of real roots of the polynomials 
+
+function evaluate_sign(p, x) # this function evaluates the sign of the polynomial p at x  
+    sign_ = nothing 
+    if p(x) > 0 
+        sign_ = 1
+    elseif p(x) < 0 
+        sign_ = -1
+    else 
+        sign_ = 0
+    end 
+    return sign_ 
+end                   
+
+function number_of_sign_changes(v) # this function computes the number of sign changes in a vector of signs (1, -1, 0) 
+                                        # while ignoring the zeros, since they do not contribute to the number of sign changes 
+    sign_changes = 0 
+    prev = nothing  
+    i = 1
+    while i <= length(v)
+        if v[i] == 0
+            i += 1
+            continue 
+        end 
+        
+        if prev !== nothing && v[i] != prev 
+            sign_changes += 1
+        end
+        
+        prev = v[i]
+        i += 1
+
+    end 
+    return sign_changes
+end         
+
+
+
+
+
+function Strum_theorem(data_set=read_json_data_set("check_set_monomial_basis.json"))   # this fundtion uses the Strum sequence to compute the number of real roots of the polynomials 
                                     # in the data set, using the Cauchy bound as the interval, to count 
                                     # the number of sign changes in the Strum sequence
     strum_seq = [] # this is the list which contains the Strum sequence for each polynomial in the data set
@@ -91,62 +133,39 @@ function Strum_sequence(data_set)   # this fundtion uses the Strum sequence to c
         a = -Bound[i]
         b = Bound[i]
         for j in seq # choose the j-th polynomial in the Strum sequence of the i-th polynomial in the data set
-            if evalpoly(a,coeffs(j)) != 0
-                push!(sign_a, sign(evalpoly(a,coeffs(j))))  # evaluate the polynomials of that sequence at a 
-            else 
-                push!(sign_a, 0) # if the polynomial is zero at a, we push 0 to the list of signs at a    
-            end
-            if evalpoly(b,coeffs(j)) != 0
-                push!(sign_b, sign(evalpoly(b,coeffs(j))))  # evaluate the polynomials of that sequence at b
-            else
-                push!(sign_b, 0) # if the polynomial is zero at b, we push 0 to the list of signs at b
-            end
-            
-
+            push!(sign_a, evaluate_sign(j,a))
+            push!(sign_b, evaluate_sign(j,b))
         end 
         
+        V_a = number_of_sign_changes(sign_a) # the number of sign changes at a
+        V_b = number_of_sign_changes(sign_b) # the number of sign changes at b 
+        
+        push!(number_of_real_roots_seq, V_a - V_b) # the number of real roots is the difference between 
+                                                    # the number of sign changes at a and b   
 
-        sign_changes_a = 0
-        for j in 1: length(sign_a)-1
-            k = j+1
-            if (sign_a[j] == 0 )
-                continue
-            elseif (sign_a[j] != 0 && sign_a[k] == 0)
-                while k <= length(sign_a) && sign_a[k] == 0
-                    k += 1
-                end
-                if (k <= length(sign_a)) && (sign_a[j] != sign_a[k])
-                    sign_changes_a += 1
-                end 
-            else 
-                if (sign_a[j] != sign_a[k])
-                    sign_changes_a += 1
-                end        
-            end
-        end
-              
-        
-        sign_changes_b = 0
-        for j in 1: length(sign_b)-1
-            k = j+1
-            if (sign_b[j] == 0) 
-                continue
-            elseif (sign_b[j] != 0 && sign_b[k] == 0)
-                while (k <= length(sign_b) && sign_b[k] == 0)
-                    k += 1
-                end
-                if (k <= length(sign_b)) && (sign_b[j] != sign_b[k])
-                    sign_changes_b += 1
-                end 
-            else 
-                if (sign_b[j] != sign_b[k])
-                    sign_changes_b += 1
-                end        
-            end
-        end  
-        
-        push!(number_of_real_roots_seq, sign_changes_a - sign_changes_b) # the number of real roots is the difference between 
-                                                                         # the number of sign changes at a and b   
     end 
     return number_of_real_roots_seq
 end                            
+
+
+model = Flux.Chain(
+    Flux.Dense(101, 50, relu),
+    Flux.Dense(50, 1)
+)
+
+
+x_raw = data_set_monomial_basis()
+y_raw = Strum_theorem(x_raw)
+
+x = Float32.(hcat(x_raw...)) ./ 1_000_000
+y = Float32.(hcat(y_raw...))
+y = reshape(y, 1, :)
+data = [(x, y)]
+
+loss(m,x,y) = Flux.mse(m(x), y)
+opt = Flux.setup(Flux.Adam(1e-2), model)
+
+for epoch in 1:500
+    Flux.train!(loss, model, data, opt)
+    println("epoch = $epoch, loss = ",loss(model, x, y))
+end    
