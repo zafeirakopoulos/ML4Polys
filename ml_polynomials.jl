@@ -1,33 +1,28 @@
-using Flux ,  CSV, DataFrames 
-df= CSV.read("C:\\Users\\USER\\Desktop\\polynomials_database.csv", DataFrame)
-function parse_vec(s)
-    if s== "Float64[]"
-        return []
-    end
-    s=strip(s, ['[',']'])
-    nums=split(s,",")
-    return parse.(Float64,strip.(nums))
-end 
-Roots_parsed=[parse_vec(s) for s in df.roots]
-max_l=maximum(length.(Roots_parsed))
+using Flux ,  CSV, JSON 
+using DataFrames
+json_parsed= JSON.parsefile("C:\\Users\\USER\\Desktop\\polynomials_database.json")
+df = DataFrame(json_parsed)
+Roots_parsed=[Float32.(v) for v in df.roots]
+Polynom=[Float32.(p) for p in df.Polynomial]
+max_l = maximum(length.(Roots_parsed))
 function pad_vec(v)
     padded=copy(v)
-    while length(padded)< max_l
-        push!(padded, NaN)
+   while length(padded)< max_l
+        push!(padded, 0.f0)
     end 
-    return padded
+     return padded
 end
-Polynom = [parse_vec(s) for s in df.Polynomial]
 Roots=[pad_vec(v) for v in Roots_parsed]
+X_train=Float32.(reduce(hcat, Polynom))
+Y_train=Float32.(reduce(hcat, Roots))
 model=Chain(Dense(6,90,relu),Dense(90,45,relu),Dense(45,6))
 opt = Flux.setup(Flux.Adam(0.01), model)
 for epoch in 1: 100
     loss, grads= Flux.withgradient(model) do m
-        Roots_hat=m(Polynom)
-        Flux.mse(Roots_hat, Roots)
+        Roots_hat=m(X_train)
+        Flux.mse(Roots_hat, Y_train)
     end
-Flux.update!(opt_state, model, grads[1])
-
+    Flux.update!(opt, model, grads[1])
 end 
 
 

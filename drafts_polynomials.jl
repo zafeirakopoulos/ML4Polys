@@ -22,3 +22,11 @@ function discriminant(coeffs)
     Discr=(-1)^((l-1)*(l-2)/2)*res/coeffs[1]
     return Discr    
 end
+function parse_vec(s)
+     if s== "Float64[]"
+         return []
+     end
+     s=strip(s, ['[',']'])
+     nums=split(s,",")
+     return parse.(Float64,strip.(nums))
+end 
