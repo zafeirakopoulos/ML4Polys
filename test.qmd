@@ -1,0 +1,38 @@
+---
+title: "Creating a database of polynomials"
+author: "E"
+date: "20/5/2026"
+format:
+  html:
+    code-fold: true
+engine: julia
+---
+We will use the AbstractAlgebra package.
+
+
+```{julia}
+using AbstractAlgebra
+```
+
+## Lets have the discriminant of a polynomial
+```{julia}
+function discriminant(f)
+    return resultant(f,derivative(f)) 
+end
+```
+
+## Separation bounds
+
+The following code is implementing the Mahler Mignotte separation bound for the roots of a polynomial. 
+The code is based on the following paper TODO cite the paper.
+
+
+Here is an example of how to use the function.
+
+<!-- 
+```{julia}
+R, x = polynomial_ring(ZZ, :x)
+f = x^3 - 6x^2 + 11x - 6
+println(discriminant(f))
+
+```     -->
