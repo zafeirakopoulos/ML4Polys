@@ -36,7 +36,7 @@ end
 
 function read_json_data_set() 
         data = JSON.parsefile("check_set_monomial_basis.json")
-    return data["monomial_basis"]
+    return [BigFloat.(poly) for poly in data["monomial_basis"]]
 end
 
 function  save_data_set(data_set, filename::String)
