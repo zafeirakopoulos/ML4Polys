@@ -1,0 +1,167 @@
+---
+title: "Polynomial Model"
+author: "Evangelia Symeonidi"
+date: "2026-05-31"
+format: html
+toc: true
+---
+# Introduction
+This report concerns a Machine Learning project focused on creating a Neural Network that calculates the real roots of a polynomial. The project consists of two parts of code. The first part constructs a database that will later be used for training the model, and the second part constitutes the neural network, which will calculate the roots of a given polynomial and has been trained on the database constructed in the previous part. The Julia programming language and the packages JSON, Random, Combinatorics, AbstractAlgebra, and Flux were used to implement the project. 
+ # Part One: Database Construction 
+ The database we constructed contains:
+
+The coefficients of the polynomial with respect to the monomial basis.
+
+Its degree.
+
+Its coefficients with respect to the Bernstein polynomial basis.
+
+The number of its real roots.
+
+The vector of its roots.
+## Coeffitients in Bernstein Basis
+It is assumed that the coefficients calculated from the scratch using the rand() function in the main database construction function are the coefficients with respect to the monomial basis. Therefore, to find the coefficients with respect to the Bernstein basis, the function change_of_basis was developed to perform the basis change. It takes the vector of coefficients with respect to the monomial basis as an argument and returns the change-of-basis matrix from monomials to Bernstein.
+```{julia}
+using JSON, Random , Combinatorics 
+using AbstractAlgebra
+  function change_of_basis(coeffs)
+      l=length(coeffs)
+      bern_basis=zeros(l, l)
+      for i=1:l
+          for j=i:l
+              bern_basis[i , j]=binomial(l-1, j-1)*binomial(j-1, i-1)*(-1)^(j-i)
+          end
+      end 
+     change_matrix= inv(bern_basis)
+     return change_matrix
+ end
+ ```
+
+Initially, the change-of-basis matrix from the Bernstein basis to the monomial basis is constructed, and then it is inverted to yield the required matrix. For its construction, we use the definition of Bernstein polynomials, which is the following:
+B_{k,n}(x) = \binom{n}{k} x^k (1-x)^{n-k}» ενώ το (1-x)^{n-k} 
+where (1-x)^{n-k} is expanded using the Newton binomial theorem. In our case, the elements of the change-of-basis matrix are precisely the coefficients of the Bernstein polynomials; thus, the i-th column of the bern_basis[i, j] matrix contains the coefficients of the Bernstein polynomial of degree i. Finally, the matrix is inverted using the inv() function, resulting in the required matrix.
+## Calculation of roots
+Subsequently, we focus on finding the vector of real roots. For this purpose, the root_finder() function was designed. 
+```{julia}
+function root_finder(coeff_s,a=nothing,b=nothing)
+    l=length(coeff_s)
+    roots=Float64[]
+    p = R(big.(coeff_s))
+    p_prime = AbstractAlgebra.derivative(p)
+    g = gcd(p, p_prime)
+    q = divexact(p,g)  
+    # println("p = ", p)
+    # println("g = ", g)
+    # println("q = ", q)
+    # println("interval = [$a,$b]")
+    if a === nothing || b === nothing
+        c_bound=1+maximum(abs(coeff_s[i]) for i=1:l-1)/abs(coeff_s[end])
+        a=Float64(-c_bound)
+        b=Float64(c_bound)
+    end
+    q_a=Float64(evaluate(q,a))
+    q_b=Float64(evaluate(q,b))
+    if  (b-a)<mmbound(coeff_s) 
+        if q_a*q_b<=0
+            push!(roots, (a + b) / 2)
+            return roots
+        end
+    end
+    m=(a+b)/2
+    q_a=Float64(evaluate(q,a))
+    q_m=Float64(evaluate(q,m))
+    q_b=Float64(evaluate(q,b))
+    if iszero(q_m)
+        return [m]
+    end
+    if q_a*q_m<=0 
+        
+        append!(roots, root_finder(coeff_s,a,m))
+    end
+    if q_m*q_b<=0 
+        append!(roots, root_finder(coeff_s,m,b))
+    end
+    return unique(roots)   
+end
+```
+
+It accepts the vector of the polynomial's coefficients and the bounds within which the roots are searched, and returns the vector of its roots. To construct this function, the AbstractAlgebra package was used, which is a Computer Algebra System (CAS); therefore, it cannot operate directly with raw polynomial coefficients. A symbolic conversion of the coefficients into a polynomial is required, which is performed using the command R(coeff_s), after first defining the polynomial ring with real coefficients via the commands:
+```{julia}
+F = RealField()
+ R, x = polynomial_ring( F,"x")
+ ```
+
+The root_finder() function is a recursive algorithm. If the user does not specify a root search interval, the maximum interval in which the roots of a polynomial can reside is assumed. This is defined as [-c,c], where c is the Cauchy bound of the polynomial. Next, the values of the polynomial at the endpoints of the Cauchy interval are calculated, and the recursion begins. If the distance between the bounds of the Cauchy interval is smaller than the Mahler-Mignotte separation bound of the polynomial, then—if the values of the polynomial at the boundaries of the interval have opposite signs—according to Bolzano's theorem, the polynomial will have a root in that interval. The midpoint of the interval is considered to be the root.
+The Mahler-Mignotte Separation bound represents the minimum interval length in which a root of the polynomial can be found and is calculated by the mmbound() function. mmbound() accepts the coefficients of a polynomial and returns its Mahler-Mignotte separation bound as defined by the mathematical formula. To implement this algorithm, the discriminant() function of the AbstractAlgebra package was used, so here too, the coefficients of the polynomial are symbolically converted into a polynomial using the same command.
+```{julia}
+F = RealField()
+ R, x = polynomial_ring( F,"x")
+function mmbound(coeff_s)
+    p = R(big.(coeff_s))
+    deg=big(length(coeff_s)-1)
+    norm=big(0.0)
+    for i in coeff_s
+        norm=norm+big(i^2)
+    end
+    norm=sqrt(norm)
+    b_mm=sqrt(3*Float64(abs((big(discriminant(p))))))/(deg^(deg/2+1)*norm^(deg-2))
+    return b_mm
+end
+```
+
+If the distance between the bounds of the Cauchy interval is not smaller than the Mahler-Mignotte Separation Bound, the interval is bisected, and the value of the polynomial at the midpoint is calculated. If this value is 0, then the midpoint is a root and is added to the root vector. Otherwise, I apply Bolzano's theorem to each of the two newly defined intervals and add to the root vector those roots that result from applying the algorithm to each of them.However, if this algorithm were applied to the polynomial itself, it would fail to calculate the roots of polynomials with degree >= 1 because the values of the polynomial at the endpoints of the interval containing these roots might not have opposite signs (e.g., (x-1)^2). For this reason, the algorithm is applied to the polynomial q, which is the quotient of the division of the given polynomial by its greatest common divisor (GCD) with its first derivative. The polynomial q has the same real roots as the given polynomial but with a multiplicity of 1, so the algorithm will calculate all of them.Finally, to achieve the maximum possible precision and to apply the algorithm to polynomials of the highest possible degree, the coefficients of the polynomial in both the mmbound() and root_finder() functions are converted to BigFloat using the big() command.
+# Part Two: Neural Network and Training
+Finally, after the database was constructed, a Neural Network was designed. It receives the information from the database and is trained on it to calculate the roots of a new polynomial.
+
+First, the information from the JSON file is retrieved and parsed using the JSON.parsefile() function built into the JSON package. It is then converted into a DataFrame structure—a collection of columns of equal length which, in the case of our dataset, contain either vectors or integers. Specifically, the dataset contains the coefficient vectors with respect to the two bases, the root vectors, the degree of the polynomials, and the number of real roots. Before feeding the data into the network, it must be properly formatted to function correctly.
+## Data Preprocessing
+Initially, the polynomial root vectors do not inherently have the same length. Therefore, with the help of the pad_vec() function, every root vector is padded to match the length of the maximum root vector, with the newly created positions filled with the value 0.0f0.
+```{julia}
+using Flux ,  CSV, JSON 
+using DataFrames
+json_parsed= JSON.parsefile("C:\\Users\\USER\\Desktop\\polynomials_database.json")
+df = DataFrame(json_parsed)
+Roots_parsed=[Float32.(v) for v in df.roots]
+Polynom=[Float32.(p) for p in df.Polynomial]
+max_l = maximum(length.(Roots_parsed))
+function pad_vec(v)
+    padded=copy(v)
+   while length(padded)< max_l
+        push!(padded, 0.f0)
+    end 
+     return padded
+end
+```
+
+Furthermore, since the coefficient and root columns are structured as vectors of vectors, they are converted into matrices using the reduce(hcat) command, making them computationally manageable for the Flux package.
+```{julia}
+Roots=[pad_vec(v) for v in Roots_parsed]
+X_train=Float32.(reduce(hcat, Polynom))
+Y_train=Float32.(reduce(hcat, Roots))
+```
+
+## Network Architecture and Training
+Once the data has been modified, the Neural Network is defined as a chain of 3 processing layers.In each layer, a linear transformation is performed on the data via the Dense(n, m) function.By applying the relu() activation function to this linear model, any negative values are set to 0, resulting in an m*1 vector at the output of each layer.At the final stage of the chain, a prediction for the polynomial roots of the database is produced, which may deviate slightly or significantly from the ground-truth roots.
+```{julia}
+model=Chain(Dense(6,90,relu),Dense(90,45,relu),Dense(45,6))
+```
+
+To improve this prediction, the Adam optimizer is selected, and the training of the model begins.
+```{julia}
+opt = Flux.setup(Flux.Adam(0.01), model)
+```
+
+The model will iterate through the data 100 times (epochs). In each iteration, it will predict the polynomial root values using the current model state, calculate the Mean Squared Error (MSE) of the prediction relative to the actual values located in the Y_train column, and compute the error gradients via automatic differentiation using the withgradient() function. These gradients determine the direction of improvement required by the model. Finally, the previously defined optimizer is applied to recursively update the model's weights in the direction dictated by the gradients, ensuring that the error will be smaller in the next iteration.
+```{julia}
+for epoch in 1: 100
+    loss, grads= Flux.withgradient(model) do m
+        Roots_hat=m(X_train)
+        Flux.mse(Roots_hat, Y_train)
+    end
+    Flux.update!(opt, model, grads[1])
+end 
+```
+
+
+
+
