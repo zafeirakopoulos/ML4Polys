@@ -1,5 +1,5 @@
 using Random, Combinatorics, Flux, Polynomials, JSON
-using Flux: Chain, Dense, ADAM, mse, train!
+using Flux: Chain, Dense, ADAM, mse, train!, onehotbatch, logitcrossentropy
 # This is the first version of the code for the training set 
 #function train_set(n) # n is the number of polynomials
     #train_set = []
