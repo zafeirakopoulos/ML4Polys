@@ -30,3 +30,14 @@ function parse_vec(s)
      nums=split(s,",")
      return parse.(Float64,strip.(nums))
 end 
+  function descartes(coeffs)
+      l=length(coeffs)
+        pos_roots=0
+       nonzero=[i for i in coeffs if i != 0]
+        for i=1:l-1
+            if nonzero[i]*nonzero[i+1]<0
+                pos_roots=pos_roots+1
+            end
+        end
+        return pos_roots
+   end 

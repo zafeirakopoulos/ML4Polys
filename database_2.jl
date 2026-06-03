@@ -11,19 +11,6 @@ using AbstractAlgebra
      change_matrix= inv(bern_basis)
      return change_matrix
  end
- R, x = polynomial_ring(QQ, "x")
-function mmbound(coeff_s)
-    p = R(big.(coeff_s))
-    deg=big(length(coeff_s)-1)
-    norm=big(0.0)
-    for i in coeff_s
-        norm=norm+big(i^2)
-    end
-    norm=sqrt(norm)
-    b_mm=sqrt(3*Float64(abs((big(discriminant(p))))))/(deg^(deg/2+1)*norm^(deg-2))
-    return b_mm
-end
-
 function root_finder(coeff_s,a=nothing,b=nothing)
     l=length(coeff_s)
     roots=Float64[]
@@ -31,10 +18,10 @@ function root_finder(coeff_s,a=nothing,b=nothing)
     p_prime = AbstractAlgebra.derivative(p)
     g = gcd(p, p_prime)
     q = divexact(p,g)  
-    println("p = ", p)
-    println("g = ", g)
-    println("q = ", q)
-    println("interval = [$a,$b]")
+    # println("p = ", p)
+    # println("g = ", g)
+    # println("q = ", q)
+    # println("interval = [$a,$b]")
     if a === nothing || b === nothing
         c_bound=1+maximum(abs(coeff_s[i]) for i=1:l-1)/abs(coeff_s[end])
         a=Float64(-c_bound)
@@ -64,42 +51,28 @@ function root_finder(coeff_s,a=nothing,b=nothing)
     end
     return unique(roots)         
 end
-#  function multi_roots(coeff_s)
+  function sturm_seq(coeff_s)
+      l=length(coeff_s)
+      p_0=R(big.(coeff_s))
+      p_1=derivative(p_0)
+      sturm_s=[p_0,p_1]
+      while degree(sturm_s[end])>0
+          r=rem(sturm_s[end-1],sturm_s[end])
+          if r == 0
+              break
+          end        
+          p_2=-r
+          push!(sturm_s, p_2)
+      end
+      return sturm_s
+  end
+#   function multi_roots(coeff_s)
 #      roots=root_finder(coeff_s)
 #      dv=[]
 #     Θα φτιαξω μια λιστα η οποια θα περιεχει ολες τις παραγωγου της συναρτησης. Θα παιρνω καθε ριζα της συναρτησης
 #     και θα ελεγχω μεχρι ποια παραγωγο μηδενιζει η ριζα. Ο αριθμος των παραγωγων που μηδενιζει ειναι ισος με την πολλαπλοτητα 
 #     της ριζας 
 #  end 
-#  function descartes(coeffs)
-#       l=length(coeffs)
-#        pos_roots=0
-#        nonzero=[i for i in coeffs if i != 0]
-#        for i=1:l-1
-#            if nonzero[i]*nonzero[i+1]<0
-#                pos_roots=pos_roots+1
-#            end
-#        end
-#        return pos_roots
-#   end 
-#  function sturm_seq(coeff_s)
-#      l=length(coeff_s)
-#      p_0=Polynomial(Rational{Int64}.(coeff_s))
-#      p_1=derivative(p_0)
-#      sturm_s=[p_0,p_1]
-#      while degree(sturm_s[end])>0
-#          r=rem(sturm_s[end-1],sturm_s[end])
-#          # r_clean = truncate(r, atol=1e-10)
-#          if r == 0
-#              break
-#          end
-        
-#          # p_2 = -r_clean
-#           p_2=-r
-#          push!(sturm_s, p_2)
-#      end
-#      return sturm_s
-#  end
 #  function sign_changes(coeff_s, x)
 #      st=sturm_seq(coeff_s)
 #      signs=Int[]
