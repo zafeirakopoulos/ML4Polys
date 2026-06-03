@@ -150,20 +150,19 @@ end
 
 model = Flux.Chain(
     Flux.Dense(101, 50, relu),
-    Flux.Dense(50, 1)
+    Flux.Dense(50, 101)
 )
 
 
-x_raw = data_set_monomial_basis()
+x_raw = read_json_data_set()
 y_raw = Strum_theorem(x_raw)
 
 x = Float32.(hcat(x_raw...)) ./ 1_000_000
-y = Float32.(hcat(y_raw...))
-y = reshape(y, 1, :)
+y = onehotbatch(y_raw, 0:100)
 data = [(x, y)]
 
-loss(m,x,y) = Flux.mse(m(x), y)
-opt = Flux.setup(Flux.Adam(1e-2), model)
+loss(m,x,y) = Flux.logitcrossentropy(m(x), y)
+opt = Flux.setup(Flux.Adam(1e-1), model)
 
 for epoch in 1:500
     Flux.train!(loss, model, data, opt)
