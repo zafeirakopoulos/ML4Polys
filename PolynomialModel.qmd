@@ -6,7 +6,7 @@ format: html
 toc: true
 ---
 # Introduction
-This report concerns a Machine Learning project focused on creating a Neural Network that calculates the real roots of a polynomial. The project consists of two parts of code. The first part constructs a database that will later be used for training the model, and the second part constitutes the neural network, which will calculate the roots of a given polynomial and has been trained on the database constructed in the previous part. The Julia programming language and the packages JSON, Random, Combinatorics, AbstractAlgebra, and Flux were used to implement the project. 
+This report concerns a Machine Learning project focused on creating a Neural Network that calculates the real roots of a polynomial. The project consists of two parts of code. The first parON, Random, Combinatorics, AbstractAlgebra, and Flux were used to implement the project. 
  # Part One: Database Construction 
  The database we constructed contains:
 

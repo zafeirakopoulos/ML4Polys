@@ -11,6 +11,18 @@ using AbstractAlgebra
      change_matrix= inv(bern_basis)
      return change_matrix
  end
+  R, x = polynomial_ring( QQ ,"x")
+function mmbound(coeff_s)
+    p = R(big.(coeff_s))
+    deg=big(length(coeff_s)-1)
+    norm=big(0.0)
+    for i in coeff_s
+        norm=norm+big(i^2)
+    end
+    norm=sqrt(norm)
+    b_mm=sqrt(3*Float64(abs((big(discriminant(p))))))/(deg^(deg/2+1)*norm^(deg-2))
+    return b_mm
+end
 function root_finder(coeff_s,a=nothing,b=nothing)
     l=length(coeff_s)
     roots=Float64[]
@@ -51,21 +63,21 @@ function root_finder(coeff_s,a=nothing,b=nothing)
     end
     return unique(roots)         
 end
-  function sturm_seq(coeff_s)
-      l=length(coeff_s)
-      p_0=R(big.(coeff_s))
-      p_1=derivative(p_0)
-      sturm_s=[p_0,p_1]
-      while degree(sturm_s[end])>0
-          r=rem(sturm_s[end-1],sturm_s[end])
-          if r == 0
-              break
-          end        
-          p_2=-r
-          push!(sturm_s, p_2)
-      end
-      return sturm_s
-  end
+  #function sturm_seq(coeff_s)
+  #    l=length(coeff_s)
+  #    p_0=R(big.(coeff_s))
+  #    p_1=derivative(p_0)
+  #    sturm_s=[p_0,p_1]
+  #    while degree(sturm_s[end])>0
+  #        r=rem(sturm_s[end-1],sturm_s[end])
+  #        if r == 0
+  #            break
+  #        end        
+  #        p_2=-r
+  #        push!(sturm_s, p_2)
+  #    end
+  #    return sturm_s
+  #end
 #   function multi_roots(coeff_s)
 #      roots=root_finder(coeff_s)
 #      dv=[]
@@ -110,45 +122,46 @@ end
 #      end
 #  end
 
-coeffs_example = 
-[ -1,  0,  8,  0,  27,  0,  48,  0,  42,  0, 0, 0,  -42,  0, -48, 0, -27,   0,  -8,   0,  1  ]
-roo_t=root_finder(coeffs_example)
+#coeffs_example = 
+#[ -1,  0,  8,  0,  27,  0,  48,  0,  42,  0, 0, 0,  -42,  0, -48, 0, -27,   0,  -8,   0,  1  ]
+#roo_t=root_finder(coeffs_example)
 
-print(roo_t) 
-println("mmbound = ", mmbound(coeffs_example))
-#  function construct_json_db(n,deg)
-#       l=length(coeffs)
-#       database = Dict{String, Any}[]
-#       polyn_r=0.#Πολυώνυμα με ρίζα
-#       polyn_nr=0#Πολυώνυμα χωρίς ρίζα
-#       while polyn_r<n/2 || polyn_nr<n/2
-#            coeffs=rand(deg+1)*2 .- 1
-#            bern_coeffs=change_of_basis(coeffs)*coeffs
-#            root_multi=real_root_count(coeffs)
-#            if root_multi==0 
-#               polyn_nr=polyn_nr+1
-#               poly_entry = Dict(
-#                   "Polynomial"   => coeffs,
-#                   "BernsteinPol" => bern_coeffs,
-#                   "degree"       => deg,
-#                   "root_multi"   => root_multi,
-#                   "roots"        => Float64[]
-#               )
-#               push!(database, poly_entry)
-#            else
-#               polyn_r=polyn_r+1 
-#               roots=root_finder(coeffs)
-#               poly_entry = Dict(
-#                   "Polynomial"   => coeffs,
-#                   "BernsteinPol" => bern_coeffs,
-#                   "degree"       => deg,
-#                   "root_multi"   => root_multi,
-#                  "roots"        => roots
-#              )
-#              push!(database, poly_entry)
-#            end
-#       end
-#       return database
-# end
+#print(roo_t) 
+#println("mmbound = ", mmbound(coeffs_example))
+ function construct_json_db(n,deg)
+       database = Dict{String, Any}[]
+       for i=1:n
+            coeff_s=rand(deg+1)*2 .- 1
+            bern_coeffs=change_of_basis(coeff_s)*coeff_s
+            root_s=root_finder(coeff_s)
+            if length(root_s)==0 
+               poly_entry = Dict(
+                   "Polynomial"   => coeff_s,
+                   "BernsteinPol" => bern_coeffs,
+                   "degree"       => deg,
+                   #"root_multi"   => root_multi,
+                   "roots"        => Float64[]
+               )
+               push!(database, poly_entry)
+            else
+               poly_entry = Dict(
+                   "Polynomial"   => coeff_s,
+                   "BernsteinPol" => bern_coeffs,
+                   "degree"       => deg,
+                   #"root_multi"   => root_multi,
+                  "roots"        => root_s
+              )
+              push!(database, poly_entry)
+            end
+       end
+       return database
+ end
+ n=1000
+ deg=5
+ db=construct_json_db(n,deg)
+ filename = "C:\\Users\\USER\\Desktop\\polynomial_database.json"
+ open(filename, "w") do f
+    JSON.print(f, db, 4)
+ end
 
 
