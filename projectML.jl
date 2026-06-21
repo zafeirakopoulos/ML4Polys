@@ -34,15 +34,116 @@ function data_set_monomial_basis(; deg=100, n=1000) # n is the number of polynom
 end
 
 
-function read_json_data_set() 
-        data = JSON.parsefile("check_set_monomial_basis.json")
-    return [BigFloat.(poly) for poly in data["monomial_basis"]]
-end
+function change_of_basis(coeffs) # courtesy of Evangelia Symeonidi
+                                 # added BigFloat to match my data type   
+      l=length(coeffs)
+      bern_basis=zeros(BigFloat, l, l)
+      for i=1:l
+          for j=i:l
+              bern_basis[i , j]=BigFloat(binomial(big(l-1), j-1)*binomial(big(j-1), i-1)*(-1)^(j-i))
+          end
+      end 
+     change_matrix= inv(bern_basis)
+     return change_matrix
+ end
 
-function  save_data_set(data_set, filename::String)
-    open(filename, "w") do io
-        JSON.print(io, data_set)
-    end
+
+function write_coeffs_list_in_polynomial_form(coeffs, language) # this function takes a list of coefficients and returns a 
+                                                                # string representation of the polynomial in the form 
+                                                                # a_n*x^n + ... + a_1*x + a_0           
+    n = length(coeffs) 
+    terms = String[]
+    for i in 1:n
+        if language == "julia"
+            if i == 1 
+                push!(terms, "$(coeffs[i])")
+            elseif i ==2 
+                push!(terms, "$(coeffs[i])*x")
+            else
+                push!(terms, "$(coeffs[i])*x^$(i-1)")    
+            end
+        end
+
+        if language == "python"
+             if i == 1 
+                push!(terms, "$(coeffs[i])")
+            elseif i ==2 
+                push!(terms, "$(coeffs[i])*x")
+            else
+                push!(terms, "$(coeffs[i])*x**$(i-1)")    
+            end
+        end 
+        
+        if language == "Tex"
+            if i == 1 
+                push!(terms, "$(coeffs[i])")
+            elseif i ==2 
+                push!(terms, "$(coeffs[i])*x")
+            else
+                push!(terms, "$(coeffs[i])*x^$(i-1)")    
+            end
+        end
+    end 
+    return join(reverse(terms), "+")
+end                 
+
+
+function write_data_base_to_json(filename, data_set)
+    data = []
+    reps = 0
+    M = change_of_basis(data_set[1]) 
+    if filename == "data_base.json"
+        for poly in data_set
+            reps += 1
+            bernstein = M*poly 
+            r = roots(Polynomials.Polynomial(reverse(poly)))
+            entry = Dict(
+                "name" => "Polynomial number $reps",  
+                "Tex" => write_coeffs_list_in_polynomial_form(poly, "Tex"),
+                "julia" => write_coeffs_list_in_polynomial_form(poly, "julia"),
+                "python" => write_coeffs_list_in_polynomial_form(poly, "python"),
+                "monomial_basis" => poly,
+                "bernstein_basis" => bernstein,
+                "degree" => length(poly) - 1,
+                "bitsize" => log2(abs(poly[length(poly)]) + 1),
+                "#real_roots" => count(x -> isreal(x), r),
+                "#integer_roots" => count(x -> isinteger(x), r),
+                "roots" => [r[i] for i in 1:length(r)],
+                "sign_changes_monomial_basis" => [number_of_sign_changes(poly)],
+                "sign_changes_bernstein_basis" => [number_of_sign_changes(bernstein)]
+            )
+            push!(data, entry)
+        end 
+        open(filename, "w") do file
+            JSON.print(file, data, 4)  
+        end
+    end     
+    if filename == "D_degree_bitsize.json"
+        for poly in data_set
+            bernstein = M*poly 
+            r = Sturm_theorem([poly])
+            entry = Dict(
+                "julia" => write_coeffs_list_in_polynomial_form(poly, "julia"),
+                "monomial_basis" => poly,
+                "bernstein_basis" => bernstein,
+                "degree" => length(poly) - 1,
+                "bitsize" => log2(abs(poly[length(poly)]) + 1),
+                "#real_roots " => r[1]
+            )
+            push!(data, entry)
+        end
+        open(filename, "w") do file
+            JSON.print(file, data, 4)  
+        end
+    end     
+end 
+
+
+function read_json_data_set() 
+        data = JSON.parsefile(" D_degree_bitsize.json")
+        monomial = [d["monomial_basis"] for d in data]
+        bernstein = [d["bernstein_basis"] for d in data]
+    return monomial, bernstein
 end
     
 
@@ -62,18 +163,25 @@ function Cauchy_bound(data_set=read_json_data_set("check_set_monomial_basis.json
 end
 
 
+function horner_scheme(p, x) # this function evaluates the polynomial p at x using Horner's Scheme
+    y = BigFloat(0)
+    for i in length(p):-1:1
+        y = p[i] + x*y
+    end
+    return y
+end
+
 function evaluate_sign(p, x) # this function evaluates the sign of the polynomial p at x  
     sign_ = nothing 
-    if p(x) > 0 
+    if horner_scheme(p, x) > 0 
         sign_ = 1
-    elseif p(x) < 0 
+    elseif horner_scheme(p, x) < 0 
         sign_ = -1
     else 
         sign_ = 0
     end 
     return sign_ 
-end                   
-
+end                 
 function number_of_sign_changes(v) # this function computes the number of sign changes in a vector of signs (1, -1, 0) 
                                         # while ignoring the zeros, since they do not contribute to the number of sign changes 
     sign_changes = 0 
