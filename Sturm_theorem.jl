@@ -100,14 +100,10 @@ function Sturm_theorem(data_set) # this fundtion uses the Sturm sequence to comp
     
     for i in 1:length(data_set) # choose the i-th polynomial in the data set  
         seq = sturm_seq[i] # choose the Sturm sequence of the i-th polynomial in the data set
-        sign_a = []
-        sign_b = []
+        sign_a = [evaluate_sign(p, a) for p in seq]
+        sign_b = [evaluate_sign(p, b) for p in seq]
         a = -Bound[i]
         b = Bound[i]
-        for j in seq # choose the j-th polynomial in the Sturm sequence of the i-th polynomial in the data set
-            push!(sign_a, evaluate_sign(j,a))
-            push!(sign_b, evaluate_sign(j,b))
-        end 
         
         V_a = number_of_sign_changes(sign_a) # the number of sign changes at a
         V_b = number_of_sign_changes(sign_b) # the number of sign changes at b 
