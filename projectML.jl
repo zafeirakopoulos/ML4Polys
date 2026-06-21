@@ -147,8 +147,7 @@ function read_json_data_set()
 end
     
 
-
-function Cauchy_bound(data_set=read_json_data_set("check_set_monomial_basis.json")) # this function computes the Cauchy bound for the roots of the polynomials in the data set
+function Cauchy_bound(data_set) # this function computes the Cauchy bound for the roots of the polynomials in the data set
     bound = BigFloat[]
     for i in 1:length(data_set)
         max_coeff = BigFloat(0)
@@ -182,8 +181,10 @@ function evaluate_sign(p, x) # this function evaluates the sign of the polynomia
     end 
     return sign_ 
 end                 
+
+
 function number_of_sign_changes(v) # this function computes the number of sign changes in a vector of signs (1, -1, 0) 
-                                        # while ignoring the zeros, since they do not contribute to the number of sign changes 
+                                   # while ignoring the zeros, since they do not contribute to the number of sign changes 
     sign_changes = 0 
     prev = nothing  
     i = 1
@@ -205,19 +206,18 @@ function number_of_sign_changes(v) # this function computes the number of sign c
 end         
 
 
-
-
-
-function Strum_theorem(data_set=read_json_data_set("check_set_monomial_basis.json"))   # this fundtion uses the Strum sequence to compute the number of real roots of the polynomials 
-                                    # in the data set, using the Cauchy bound as the interval, to count 
-                                    # the number of sign changes in the Strum sequence
-    strum_seq = [] # this is the list which contains the Strum sequence for each polynomial in the data set
+function Sturm_theorem(data_set) # this fundtion uses the Sturm sequence to compute the number of real roots of the polynomials 
+                                 # in the data set, using the Cauchy bound as the interval, to count 
+                                 # the number of sign changes in the Sturm sequence
+    sturm_seq = [] # this is the list which contains the Sturm sequence for each polynomial in the data set
     for i in data_set 
         p0 = Polynomials.Polynomial(reverse(i)) # p0 is the original polynomial
         p1 = derivative(p0) # p1 is the derivative of p0
-        seq = [p0,p1]  # the Strum sequence for the i-th polynomial in the data set  
+        p0_new = div(p0, gcd(p0, p1)) # this makes sure that the polynomial is square-free
+        p1_new = derivative(p0_new) # p1 is the derivative of the square-free p0 
+        seq = [p0_new, p1_new]  # the Sturm sequence for the i-th polynomial in the data set  
         while true 
-            q, p = divrem(seq[end-1], seq[end]) # p is the remainder of the division of the last two polynomials in the sequence
+            _, p = divrem(seq[end-1], seq[end]) # p is the remainder of the division of the last two polynomials in the sequence
             p = -p
             if iszero(p)
                 break 
@@ -225,25 +225,21 @@ function Strum_theorem(data_set=read_json_data_set("check_set_monomial_basis.jso
                 push!(seq,p)
             end    
         end
-        push!(strum_seq,seq)
+        push!(sturm_seq,seq)
     end
     Bound = Cauchy_bound(data_set)
     number_of_real_roots_seq = [] # this list contains the number of real roots for each one of the polynomials
                                   # in the data set
                                   # The number of real roots of the i-th polynomial in the data set 
-                                  # is the difference between the number of sign changes in the Strum sequence at a and b, 
+                                  # is the difference between the number of sign changes in the Sturm sequence at a and b, 
                                   # where a and b are the endpoints of the interval defined by the Cauchy bound
     
     for i in 1:length(data_set) # choose the i-th polynomial in the data set  
-        seq = strum_seq[i] # choose the Strum sequence of the i-th polynomial in the data set
-        sign_a = []
-        sign_b = []
+        seq = sturm_seq[i] # choose the Sturm sequence of the i-th polynomial in the data set
+        sign_a = [evaluate_sign(p, a) for p in seq]
+        sign_b = [evaluate_sign(p, b) for p in seq]
         a = -Bound[i]
         b = Bound[i]
-        for j in seq # choose the j-th polynomial in the Strum sequence of the i-th polynomial in the data set
-            push!(sign_a, evaluate_sign(j,a))
-            push!(sign_b, evaluate_sign(j,b))
-        end 
         
         V_a = number_of_sign_changes(sign_a) # the number of sign changes at a
         V_b = number_of_sign_changes(sign_b) # the number of sign changes at b 
@@ -256,23 +252,78 @@ function Strum_theorem(data_set=read_json_data_set("check_set_monomial_basis.jso
 end                            
 
 
-model = Flux.Chain(
-    Flux.Dense(101, 50, relu),
-    Flux.Dense(50, 101)
+# classification model 
+x_raw_mon_class = read_json_data_set()[1]
+y_raw_mon_class = Sturm_theorem(x_raw_mon_class)
+
+x_mon_class = hcat(x_raw_mon_class...)
+y_mon = onehotbatch(y_raw_mon_class, 0:100)
+
+n = size(x_mon_class, 2)
+idx = shuffle(1:n)
+train_size = Int(0.8*n)
+test_idx  = idx[train_size+1:end]
+
+x_mon_train = x_mon_class[:, idx[1:train_size]]
+x_mon_test = x_mon_class[:, idx[train_size+1:end]]
+
+y_train = y_mon[:, idx[1:train_size]]
+y_test  = y_mon[:, idx[train_size+1:end]]
+
+train_data_class = [(x_mon_train, y_train)]
+test_data_class = [(x_mon_test, y_test)]
+
+model_class = Flux.Chain(
+    Flux.Dense(size(x_mon_class, 1), 10, relu),
+    Flux.Dense(10, 101)
 )
 
-
-x_raw = read_json_data_set()
-y_raw = Strum_theorem(x_raw)
-
-x = Float32.(hcat(x_raw...)) ./ 1_000_000
-y = onehotbatch(y_raw, 0:100)
-data = [(x, y)]
-
-loss(m,x,y) = Flux.logitcrossentropy(m(x), y)
-opt = Flux.setup(Flux.Adam(1e-1), model)
+loss_class(m,x_mon_train,y_mon_train) = Flux.logitcrossentropy(m(x_mon_train), y_mon_train)
+opt_class = Flux.setup(Flux.Adam(1e-1), model_class)
 
 for epoch in 1:500
-    Flux.train!(loss, model, data, opt)
-    println("epoch = $epoch, loss = ",loss(model, x, y))
+    Flux.train!(loss_class, model_class, train_data_class, opt_class)
+    println("epoch = $epoch, loss = ",loss_class(model_class, x_mon_train, y_mon_train))
 end    
+
+loss_class(m,x_mon_test,y_mon_test) = Flux.logitcrossentropy(m(x_mon_test), y_mon_test)
+opt_class = Flux.setup(Flux.Adam(1e-1), model_class)
+Flux.train!(loss_class, model_class, test_data_class, opt_class)
+println("epoch = $epoch, loss = ",loss_class(model_class, x_mon_test, y_mon_test))
+
+
+#regression model 
+x_raw_mon_reg = read_json_data_set()[1]
+y_raw_mon_reg = Sturm_theorem(x_raw_mon_reg)
+
+x_mon_reg = hcat(x_raw_mon_reg...)
+y_mon_reg = reshape(y_raw_mon_reg, 1, :)
+
+n = size(x_mon_reg, 2)
+idx_reg = shuffle(1:n)
+tain_size_reg = Int(0.8*n)
+
+x_mon_train_reg, y_mon_train_reg = x_mon_reg[:, idx_reg[1:train_size_reg]], y_mon_reg[:, idx_reg[1:train_size_reg]]
+x_mon_test_reg, y_mon_test_reg = x_mon_reg[:, idx_reg[train_size_reg+1:end]], y_mon_reg[:, idx_reg[train_size_reg+1:end]]
+
+train_data_reg = [(x_mon_train_reg, y_mon_train_reg)]
+test_data_reg = [(x_mon_test_reg, y_mon_test_reg)]
+
+model_reg = Flux.Chain(
+    Flux.Dense(size(x_mon_reg, 1), 10, relu),
+    Flux.Dense(10, 1)
+)
+
+loss_reg(m, x_mon_train_reg, y_mon_train_reg) = Flux.mse(m(x_mon_train_reg), y_mon_train_reg)
+opt_reg = Flux.setup(Flux.Adam(1e-1), model_reg)
+
+
+for epoch in 1:500
+    Flux.train!(loss_reg, model_reg, train_data_reg, opt_reg)
+    println("epoch = $epoch, loss = ",loss_reg(model_reg, x_mon_train_reg, y_mon_train_reg))
+end
+
+loss_reg(m, x_mon_test_reg, y_mon_test_reg) = Flux.mse(m(x_mon_test_reg), y_mon_test_reg)
+opt_reg = Flux.setup(Flux.Adam(1e-1), model_reg)
+Flux.train!(loss_reg, model_reg, test_data_reg, opt_reg)
+println("epoch = $epoch, loss = ",loss_reg(model_reg, x_mon_test_reg, y_mon_test_reg))
