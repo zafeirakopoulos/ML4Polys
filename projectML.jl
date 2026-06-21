@@ -164,7 +164,8 @@ end
 
 function horner_scheme(p, x) # this function evaluates the polynomial p at x using Horner's Scheme
     y = BigFloat(0)
-    for i in length(p):-1:1
+    n = length(p)-1
+    for i in n:-1:0
         y = p[i] + x*y
     end
     return y
