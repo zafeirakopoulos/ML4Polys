@@ -33,17 +33,25 @@ function Cauchy_bound(data_set) # this function computes the Cauchy bound for th
 end
 
 
+function horner_scheme(p, x) # this function evaluates the polynomial p at x using Horner's Scheme
+    y = BigFloat(0)
+    for i in length(p):-1:1
+        y = p[i] + x*y
+    end
+    return y
+end
+
 function evaluate_sign(p, x) # this function evaluates the sign of the polynomial p at x  
     sign_ = nothing 
-    if p(x) > 0 
+    if horner_scheme(p, x) > 0 
         sign_ = 1
-    elseif p(x) < 0 
+    elseif horner_scheme(p, x) < 0 
         sign_ = -1
     else 
         sign_ = 0
     end 
     return sign_ 
-end                   
+end              
 
 
 function number_of_sign_changes(v) # this function computes the number of sign changes in a vector of signs (1, -1, 0) 
