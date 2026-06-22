@@ -1,20 +1,5 @@
-using Random, Combinatorics, Flux, Polynomials, JSON
+using Random, Combinatorics, Flux, Polynomials, JSON, GenericLinearAlgebra, DataStructures, AMRVW
 using Flux: Chain, Dense, ADAM, mse, train!, onehotbatch, logitcrossentropy
-# This is the first version of the code for the training set 
-#function train_set(n) # n is the number of polynomials
-    #train_set = []
-    #for i=1:n 
-        #deg = floor(10*rand())
-        #coef = []                       
-        #for j=1:(deg+1)
-            #a_j = floor(10*rand())
-            #push!(coef,a_j)
-        #end
-        #push!(train_set,coef)
-    #end    
-    #return train_set
-#end
-
 
 function data_set_monomial_basis(; deg=100, n=1000) # n is the number of polynomials, deg is the degree of the polynomials
     data_set = Vector{Vector{BigFloat}}() # this is the list which contains the data set of polynomials in monomial basis
@@ -96,8 +81,8 @@ function write_data_base_to_json(filename, data_set)
         for poly in data_set
             reps += 1
             bernstein = M*poly 
-            r = roots(Polynomials.Polynomial(reverse(poly)))
-            entry = Dict(
+            roots = AMRVW.roots(poly)
+            entry = OrderedDict(
                 "name" => "Polynomial number $reps",  
                 "Tex" => write_coeffs_list_in_polynomial_form(poly, "Tex"),
                 "julia" => write_coeffs_list_in_polynomial_form(poly, "julia"),
@@ -106,9 +91,9 @@ function write_data_base_to_json(filename, data_set)
                 "bernstein_basis" => bernstein,
                 "degree" => length(poly) - 1,
                 "bitsize" => log2(abs(poly[length(poly)]) + 1),
-                "#real_roots" => count(x -> isreal(x), r),
-                "#integer_roots" => count(x -> isinteger(x), r),
-                "roots" => [r[i] for i in 1:length(r)],
+                "#real_roots" => count(x -> isreal(x), roots),
+                "#integer_roots" => count(x -> isinteger(x), roots),
+                "roots" => [roots[i] for i in 1:length(roots)],
                 "sign_changes_monomial_basis" => [number_of_sign_changes(poly)],
                 "sign_changes_bernstein_basis" => [number_of_sign_changes(bernstein)]
             )
@@ -118,17 +103,17 @@ function write_data_base_to_json(filename, data_set)
             JSON.print(file, data, 4)  
         end
     end     
-    if filename == "D_degree_bitsize.json"
+    if filename == "data_set.json"
         for poly in data_set
             bernstein = M*poly 
-            r = Sturm_theorem([poly])
-            entry = Dict(
+            roots = Sturm_theorem([poly])
+            entry = OrderedDict(
                 "julia" => write_coeffs_list_in_polynomial_form(poly, "julia"),
                 "monomial_basis" => poly,
                 "bernstein_basis" => bernstein,
                 "degree" => length(poly) - 1,
                 "bitsize" => log2(abs(poly[length(poly)]) + 1),
-                "#real_roots " => r[1]
+                "#real_roots " => roots[1]
             )
             push!(data, entry)
         end
@@ -140,12 +125,12 @@ end
 
 
 function read_json_data_set() 
-        data = JSON.parsefile(" D_degree_bitsize.json")
+        data = JSON.parsefile("data_set.json")
         monomial = [d["monomial_basis"] for d in data]
         bernstein = [d["bernstein_basis"] for d in data]
     return monomial, bernstein
 end
-    
+
 
 function Cauchy_bound(data_set) # this function computes the Cauchy bound for the roots of the polynomials in the data set
     bound = BigFloat[]
@@ -162,30 +147,21 @@ function Cauchy_bound(data_set) # this function computes the Cauchy bound for th
 end
 
 
-function horner_scheme(p, x) # this function evaluates the polynomial p at x using Horner's Scheme
-    y = BigFloat(0)
-    n = length(p)-1
-    for i in n:-1:0
-        y = p[i] + x*y
-    end
-    return y
-end
-
 function evaluate_sign(p, x) # this function evaluates the sign of the polynomial p at x  
     sign_ = nothing 
-    if horner_scheme(p, x) > 0 
+    if p(x) > 0 
         sign_ = 1
-    elseif horner_scheme(p, x) < 0 
+    elseif p(x) < 0 
         sign_ = -1
     else 
         sign_ = 0
     end 
     return sign_ 
-end                 
+end                   
 
 
 function number_of_sign_changes(v) # this function computes the number of sign changes in a vector of signs (1, -1, 0) 
-                                   # while ignoring the zeros, since they do not contribute to the number of sign changes 
+                                        # while ignoring the zeros, since they do not contribute to the number of sign changes 
     sign_changes = 0 
     prev = nothing  
     i = 1
@@ -207,12 +183,13 @@ function number_of_sign_changes(v) # this function computes the number of sign c
 end         
 
 
+
 function Sturm_theorem(data_set) # this fundtion uses the Sturm sequence to compute the number of real roots of the polynomials 
                                  # in the data set, using the Cauchy bound as the interval, to count 
                                  # the number of sign changes in the Sturm sequence
     sturm_seq = [] # this is the list which contains the Sturm sequence for each polynomial in the data set
     for i in data_set 
-        p0 = Polynomials.Polynomial(reverse(i)) # p0 is the original polynomial
+        p0 = Polynomials.Polynomial(i) # p0 is the original polynomial
         p1 = derivative(p0) # p1 is the derivative of p0
         p0_new = div(p0, gcd(p0, p1)) # this makes sure that the polynomial is square-free
         p1_new = derivative(p0_new) # p1 is the derivative of the square-free p0 
@@ -237,10 +214,10 @@ function Sturm_theorem(data_set) # this fundtion uses the Sturm sequence to comp
     
     for i in 1:length(data_set) # choose the i-th polynomial in the data set  
         seq = sturm_seq[i] # choose the Sturm sequence of the i-th polynomial in the data set
-        sign_a = [evaluate_sign(p, a) for p in seq]
-        sign_b = [evaluate_sign(p, b) for p in seq]
         a = -Bound[i]
         b = Bound[i]
+        sign_a = [evaluate_sign(p, a) for p in seq]
+        sign_b = [evaluate_sign(p, b) for p in seq]
         
         V_a = number_of_sign_changes(sign_a) # the number of sign changes at a
         V_b = number_of_sign_changes(sign_b) # the number of sign changes at b 
