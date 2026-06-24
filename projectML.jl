@@ -1,25 +1,25 @@
-using Random, Combinatorics, Flux, Polynomials, JSON, GenericLinearAlgebra, DataStructures, AMRVW
+using Random, Combinatorics, Flux, Polynomials, JSON, GenericLinearAlgebra, DataStructures, AbstractAlgebra
 using Flux: Chain, Dense, ADAM, mse, train!, onehotbatch, logitcrossentropy
 
 function data_set_monomial_basis(; deg=100, n=1000) # n is the number of polynomials, deg is the degree of the polynomials
     data_set = Vector{Vector{BigFloat}}() # this is the list which contains the data set of polynomials in monomial basis
     for i in 1:n
-        coeff=BigFloat[]
+        coeff_s=BigFloat[]
         for j in 1:deg
             if rand(Bool) # rand(Bool) is a boolean variable which decides whether to include the monomial x^j
-                push!(coeff, BigFloat(rand(-1000000:1000000)))
+                push!(coeff_s, BigFloat(rand(-1000000:1000000)))
             else 
-                push!(coeff, BigFloat(0))
+                push!(coeff_s, BigFloat(0))
             end 
         end
-        push!(coeff, BigFloat(rand(-1000000:1000000))) # leading coefficient is non-zero
-        push!(data_set, coeff)
+        push!(coeff_s, BigFloat(rand(-1000000:1000000))) # leading coefficient is non-zero
+        push!(data_set, coeff_s)
     end
     return data_set
 end
-function change_of_basis(coeffs) # courtesy of Evangelia Symeonidi
+function change_of_basis(coeff_s) # courtesy of Evangelia Symeonidi
                                  # added BigFloat to match my data type   
-      l=length(coeffs)
+      l=length(coeff_s)
       bern_basis=zeros(BigFloat, l, l)
       for i=1:l
           for j=i:l
@@ -29,8 +29,20 @@ function change_of_basis(coeffs) # courtesy of Evangelia Symeonidi
      change_matrix= inv(bern_basis)
      return change_matrix
  end
+ function mmbound(coeff_s)
+    p = R(big.(coeff_s))
+    deg=big(length(coeff_s)-1)
+    norm=big(0.0)
+    for i in coeff_s
+        norm=norm+big(i^2)
+    end
+    norm=sqrt(norm)
+    b_mm=sqrt(3*Float64(abs((big(discriminant(p))))))/(deg^(deg/2+1)*norm^(deg-2))
+    return b_mm
+end
  function root_finder(coeff_s,a=nothing,b=nothing)
     l=length(coeff_s)
+    roots=Float64[]
     p = R(big.(coeff_s))
     p_prime = AbstractAlgebra.derivative(p)
     g = gcd(p, p_prime)
@@ -40,39 +52,36 @@ function change_of_basis(coeffs) # courtesy of Evangelia Symeonidi
         a=Float64(-c_bound)
         b=Float64(c_bound)
     end
-    bound = mmbound(coeff_s)
-    roots=Float64[]
-    _bisection_search!(roots, q, a, b, bound)
-    return unique(roots)
-end
-function _bisection_search!(roots, q, a, b, bound)
-    q_a = Float64(evaluate(q, a))
-    q_b = Float64(evaluate(q, b))
-    if (b - a) < bound 
-        if q_a * q_b <= 0
+    q_a=Float64(evaluate(q,a))
+    q_b=Float64(evaluate(q,b))
+    if  (b-a)<mmbound(coeff_s) 
+        if q_a*q_b<=0
             push!(roots, (a + b) / 2)
-            return
+            return roots
         end
     end
-    m = (a + b) / 2
-    q_m = Float64(evaluate(q, m))
+    m=(a+b)/2
+    q_a=Float64(evaluate(q,a))
+    q_m=Float64(evaluate(q,m))
+    q_b=Float64(evaluate(q,b))
     if iszero(q_m)
-        push!(roots, m)
-        return
+        return [m]
     end
-    if q_a * q_m <= 0 
-        _bisection_search!(roots, q, a, m, bound)
+    if q_a*q_m<=0 
+        
+        append!(roots, root_finder(coeff_s,a,m))
     end
-    if q_m * q_b <= 0 
-        _bisection_search!(roots, q, m, b, bound)
+    if q_m*q_b<=0 
+        append!(roots, root_finder(coeff_s,m,b))
     end
+    return unique(roots)         
 end
-function write_coeffs_list_in_polynomial_form(coeffs, language)
-    n = length(coeffs)
+function write_coeffs_list_in_polynomial_form(coeff_s, language)
+    n = length(coeff_s)
     terms = String[]
     pow_sym = (language == "python") ? "**" : "^"
     for i in 1:n
-        c = coeffs[i]
+        c = coeff_s[i]
         if i == 1
             term = "$(abs(c))"
         elseif i == 2
@@ -92,7 +101,6 @@ function write_coeffs_list_in_polynomial_form(coeffs, language)
     end
     return final_str
 end
-
 function write_data_base_to_json(filename, data_set)
     data = []
     reps = 0
@@ -101,7 +109,7 @@ function write_data_base_to_json(filename, data_set)
         for poly in data_set
             reps += 1
             bernstein = M*poly 
-            roots = AMRVW.roots(poly)
+            roots = root_finder()
             entry = OrderedDict(
                 "name" => "Polynomial number $reps",  
                 "Tex" => write_coeffs_list_in_polynomial_form(poly, "Tex"),
