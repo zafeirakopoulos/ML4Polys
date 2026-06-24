@@ -13,43 +13,41 @@ using AbstractAlgebra
  end
 function root_finder(coeff_s,a=nothing,b=nothing)
     l=length(coeff_s)
-    roots=Float64[]
     p = R(big.(coeff_s))
     p_prime = AbstractAlgebra.derivative(p)
     g = gcd(p, p_prime)
     q = divexact(p,g)  
-    # println("p = ", p)
-    # println("g = ", g)
-    # println("q = ", q)
-    # println("interval = [$a,$b]")
     if a === nothing || b === nothing
         c_bound=1+maximum(abs(coeff_s[i]) for i=1:l-1)/abs(coeff_s[end])
         a=Float64(-c_bound)
         b=Float64(c_bound)
     end
-    q_a=Float64(evaluate(q,a))
-    q_b=Float64(evaluate(q,b))
-    if  (b-a)<mmbound(coeff_s) 
-        if q_a*q_b<=0
+    bound = mmbound(coeff_s)
+    roots=Float64[]
+    _bisection_search!(roots, q, a, b, bound)
+    return unique(roots)
+end
+function _bisection_search!(roots, q, a, b, bound)
+    q_a = Float64(evaluate(q, a))
+    q_b = Float64(evaluate(q, b))
+    if (b - a) < bound 
+        if q_a * q_b <= 0
             push!(roots, (a + b) / 2)
-            return roots
+            return
         end
     end
-    m=(a+b)/2
-    q_a=Float64(evaluate(q,a))
-    q_m=Float64(evaluate(q,m))
-    q_b=Float64(evaluate(q,b))
+    m = (a + b) / 2
+    q_m = Float64(evaluate(q, m))
     if iszero(q_m)
-        return [m]
+        push!(roots, m)
+        return
     end
-    if q_a*q_m<=0 
-        
-        append!(roots, root_finder(coeff_s,a,m))
+    if q_a * q_m <= 0 
+        _bisection_search!(roots, q, a, m, bound)
     end
-    if q_m*q_b<=0 
-        append!(roots, root_finder(coeff_s,m,b))
+    if q_m * q_b <= 0 
+        _bisection_search!(roots, q, m, b, bound)
     end
-    return unique(roots)         
 end
   function sturm_seq(coeff_s)
       l=length(coeff_s)
