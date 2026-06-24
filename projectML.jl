@@ -17,8 +17,6 @@ function data_set_monomial_basis(; deg=100, n=1000) # n is the number of polynom
     end
     return data_set
 end
-
-
 function change_of_basis(coeffs) # courtesy of Evangelia Symeonidi
                                  # added BigFloat to match my data type   
       l=length(coeffs)
@@ -31,6 +29,44 @@ function change_of_basis(coeffs) # courtesy of Evangelia Symeonidi
      change_matrix= inv(bern_basis)
      return change_matrix
  end
+ function root_finder(coeff_s,a=nothing,b=nothing)
+    l=length(coeff_s)
+    p = R(big.(coeff_s))
+    p_prime = AbstractAlgebra.derivative(p)
+    g = gcd(p, p_prime)
+    q = divexact(p,g)  
+    if a === nothing || b === nothing
+        c_bound=1+maximum(abs(coeff_s[i]) for i=1:l-1)/abs(coeff_s[end])
+        a=Float64(-c_bound)
+        b=Float64(c_bound)
+    end
+    bound = mmbound(coeff_s)
+    roots=Float64[]
+    _bisection_search!(roots, q, a, b, bound)
+    return unique(roots)
+end
+function _bisection_search!(roots, q, a, b, bound)
+    q_a = Float64(evaluate(q, a))
+    q_b = Float64(evaluate(q, b))
+    if (b - a) < bound 
+        if q_a * q_b <= 0
+            push!(roots, (a + b) / 2)
+            return
+        end
+    end
+    m = (a + b) / 2
+    q_m = Float64(evaluate(q, m))
+    if iszero(q_m)
+        push!(roots, m)
+        return
+    end
+    if q_a * q_m <= 0 
+        _bisection_search!(roots, q, a, m, bound)
+    end
+    if q_m * q_b <= 0 
+        _bisection_search!(roots, q, m, b, bound)
+    end
+end
 function write_coeffs_list_in_polynomial_form(coeffs, language)
     n = length(coeffs)
     terms = String[]
