@@ -31,47 +31,31 @@ function change_of_basis(coeffs) # courtesy of Evangelia Symeonidi
      change_matrix= inv(bern_basis)
      return change_matrix
  end
-
-
-function write_coeffs_list_in_polynomial_form(coeffs, language) # this function takes a list of coefficients and returns a 
-                                                                # string representation of the polynomial in the form 
-                                                                # a_n*x^n + ... + a_1*x + a_0           
-    n = length(coeffs) 
+function write_coeffs_list_in_polynomial_form(coeffs, language)
+    n = length(coeffs)
     terms = String[]
+    pow_sym = (language == "python") ? "**" : "^"
     for i in 1:n
-        if language == "julia"
-            if i == 1 
-                push!(terms, "$(coeffs[i])")
-            elseif i ==2 
-                push!(terms, "$(coeffs[i])*x")
-            else
-                push!(terms, "$(coeffs[i])*x^$(i-1)")    
-            end
+        c = coeffs[i]
+        if i == 1
+            term = "$(abs(c))"
+        elseif i == 2
+            term = "$(abs(c))*x"
+        else
+            term = "$(abs(c))*x$(pow_sym)$(i-1)"
         end
-
-        if language == "python"
-             if i == 1 
-                push!(terms, "$(coeffs[i])")
-            elseif i ==2 
-                push!(terms, "$(coeffs[i])*x")
-            else
-                push!(terms, "$(coeffs[i])*x**$(i-1)")    
-            end
-        end 
-        
-        if language == "Tex"
-            if i == 1 
-                push!(terms, "$(coeffs[i])")
-            elseif i ==2 
-                push!(terms, "$(coeffs[i])*x")
-            else
-                push!(terms, "$(coeffs[i])*x^$(i-1)")    
-            end
+        if c >= 0
+            push!(terms, "+" * term)
+        else
+            push!(terms, "-" * term)
         end
-    end 
-    return join(reverse(terms), "+")
-end                 
-
+    end
+    final_str = join(reverse(terms))
+    if startswith(final_str, "+")
+        final_str = final_str[2:end]
+    end
+    return final_str
+end
 
 function write_data_base_to_json(filename, data_set)
     data = []
