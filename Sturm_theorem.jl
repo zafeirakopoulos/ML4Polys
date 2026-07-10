@@ -33,25 +33,17 @@ function Cauchy_bound(data_set) # this function computes the Cauchy bound for th
 end
 
 
-function horner_scheme(p, x) # this function evaluates the polynomial p at x using Horner's Scheme
-    y = BigFloat(0)
-    for i in length(p):-1:1
-        y = p[i] + x*y
-    end
-    return y
-end
-
 function evaluate_sign(p, x) # this function evaluates the sign of the polynomial p at x  
     sign_ = nothing 
-    if horner_scheme(p, x) > 0 
+    if p(x) > 0 
         sign_ = 1
-    elseif horner_scheme(p, x) < 0 
+    elseif p(x) < 0 
         sign_ = -1
     else 
         sign_ = 0
     end 
     return sign_ 
-end              
+end                   
 
 
 function number_of_sign_changes(v) # this function computes the number of sign changes in a vector of signs (1, -1, 0) 
@@ -83,7 +75,7 @@ function Sturm_theorem(data_set) # this fundtion uses the Sturm sequence to comp
                                  # the number of sign changes in the Sturm sequence
     sturm_seq = [] # this is the list which contains the Sturm sequence for each polynomial in the data set
     for i in data_set 
-        p0 = Polynomials.Polynomial(reverse(i)) # p0 is the original polynomial
+        p0 = Polynomials.Polynomial(i) # p0 is the original polynomial
         p1 = derivative(p0) # p1 is the derivative of p0
         p0_new = div(p0, gcd(p0, p1)) # this makes sure that the polynomial is square-free
         p1_new = derivative(p0_new) # p1 is the derivative of the square-free p0 
@@ -108,10 +100,10 @@ function Sturm_theorem(data_set) # this fundtion uses the Sturm sequence to comp
     
     for i in 1:length(data_set) # choose the i-th polynomial in the data set  
         seq = sturm_seq[i] # choose the Sturm sequence of the i-th polynomial in the data set
-        sign_a = [evaluate_sign(p, a) for p in seq]
-        sign_b = [evaluate_sign(p, b) for p in seq]
         a = -Bound[i]
         b = Bound[i]
+        sign_a = [evaluate_sign(p, a) for p in seq]
+        sign_b = [evaluate_sign(p, b) for p in seq]
         
         V_a = number_of_sign_changes(sign_a) # the number of sign changes at a
         V_b = number_of_sign_changes(sign_b) # the number of sign changes at b 
@@ -121,4 +113,4 @@ function Sturm_theorem(data_set) # this fundtion uses the Sturm sequence to comp
 
     end 
     return number_of_real_roots_seq
-end                           
+end                            
